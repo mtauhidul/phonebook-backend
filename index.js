@@ -1,7 +1,9 @@
 const express = require("express");
 const morgan = require("morgan");
+const cors = require("cors");
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 morgan.token("body", (req) => JSON.stringify(req.body));
@@ -97,7 +99,7 @@ app.post("/api/persons", (request, response) => {
   response.json(newPerson);
 });
 
-const PORT = 3001;
+const PORT = 3001 || process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Phonebook backend server running on port ${PORT}`);
 });
