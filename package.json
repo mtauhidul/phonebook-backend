@@ -7,7 +7,7 @@
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:ui": "rm -rf dist && cd ../fullstackopen/part2/phonebook && npm run build && cp -r dist ../../../phonebook-backend",
-    "deploy": "fly deploy",
+    "deploy": "git push heroku",
     "deploy:full": "npm run build:ui && npm run deploy",
     "logs:prod": "heroku logs --tail"
   },
