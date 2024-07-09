@@ -13,81 +13,100 @@ app.use(express.json());
 morgan.token("body", (req) => JSON.stringify(req.body));
 const format =
   ":method :url :status :res[content-length] - :response-time ms :body";
-
 app.use(morgan(format));
 
-app.get("/", (request, response) => {
-  response.send("<h1>Welcome to Phonebook Backend!<h1/>");
+// Route Handlers
+app.get("/", (req, res) => {
+  res.send("<h1>Welcome to Phonebook Backend!<h1/>");
 });
 
-app.get("/api/persons", (request, response) => {
-  Person.find({}).then((persons) => {
-    response.json(persons);
-  });
+app.get("/api/persons", (req, res, next) => {
+  Person.find({})
+    .then((persons) => res.json(persons))
+    .catch(next);
 });
 
-app.get("/info", (request, response) => {
-  const totalPersons = persons.length;
-  const requestTime = new Date();
-
-  response.send(
-    `<p>Phonebook has info for ${totalPersons} people <br/> ${requestTime}<p/>`
-  );
-});
-
-app.get("/api/persons/:id", (request, response) => {
-  const id = request.params.id;
-  Person.find({ id }).then((person) => {
-    if (person) {
-      response.json(person);
-    } else {
-      response.status(404).end();
-    }
-  });
-});
-
-app.delete("/api/persons/:id", (request, response) => {
-  const id = request.params.id;
-
-  Person.findByIdAndDelete(id)
-    .then((result) => {
-      response.status(204).end();
+app.get("/info", (req, res, next) => {
+  Person.find({})
+    .then((persons) => {
+      const totalPersons = persons.length;
+      const requestTime = new Date();
+      res.send(
+        `<p>Phonebook has info for ${totalPersons} people <br/> ${requestTime}<p/>`
+      );
     })
-    .catch((error) => {
-      console.log(error.message);
-      response.status(400).send({ error: "malformed id" });
-    });
+    .catch(next);
 });
 
-app.post("/api/persons", async (request, response) => {
-  const body = request.body;
-
-  if (!body.name || !body.number) {
-    return response.status(400).json({
-      error: "name or number missing",
-    });
-  }
-
-  try {
-    const existingPerson = await Person.findOne({ name: body.name });
-
-    if (existingPerson) {
-      return response.status(400).json({ error: "name must be unique" });
-    }
-
-    const newPerson = new Person({
-      name: body.name,
-      number: body.number,
-    });
-
-    const savedPerson = await newPerson.save();
-    response.json(savedPerson);
-  } catch (error) {
-    response.status(500).json({ error: "something went wrong" });
-  }
+app.get("/api/persons/:id", (req, res, next) => {
+  Person.findById(req.params.id)
+    .then((person) => {
+      if (person) {
+        res.json(person);
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
-const PORT = process.env.PORT;
+app.delete("/api/persons/:id", (req, res, next) => {
+  Person.findByIdAndDelete(req.params.id)
+    .then(() => res.status(204).end())
+    .catch(next);
+});
+
+app.post("/api/persons", (req, res, next) => {
+  const { name, number } = req.body;
+
+  if (!name || !number) {
+    return res.status(400).json({ error: "name or number missing" });
+  }
+
+  Person.findOne({ name })
+    .then((existingPerson) => {
+      if (existingPerson) {
+        existingPerson.number = number;
+        return existingPerson.save().then((updatedPerson) => {
+          res.json(updatedPerson);
+        });
+      } else {
+        const person = new Person({ name, number });
+        return person.save().then((savedPerson) => res.json(savedPerson));
+      }
+    })
+    .catch(next);
+});
+
+app.put("/api/persons/:id", (req, res, next) => {
+  const { name, number } = req.body;
+  const person = { name, number };
+
+  Person.findByIdAndUpdate(req.params.id, person, { new: true })
+    .then((updatedPerson) => res.json(updatedPerson))
+    .catch(next);
+});
+
+// Unknown Endpoint Middleware
+const unknownEndpoint = (req, res) => {
+  res.status(404).send({ error: "unknown endpoint" });
+};
+app.use(unknownEndpoint);
+
+// Error Handling Middleware
+const errorHandler = (error, req, res, next) => {
+  console.error(error.message);
+
+  if (error.name === "CastError") {
+    return res.status(400).send({ error: "malformed id!" });
+  }
+
+  next(error);
+};
+app.use(errorHandler);
+
+// Server Initialization
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Phonebook backend server running on port ${PORT}`);
 });
